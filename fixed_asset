@@ -1,0 +1,115 @@
+SELECT 
+  C.ASSET_NUMBER, 
+  C.DESCRIPTION, 
+  C.ATTRIBUTE_CATEGORY_CODE ASSET_CATEGORY, 
+  (
+    SELECT 
+      fac.DESCRIPTION 
+    FROM 
+      FA_CATEGORIES_VL fac 
+    WHERE 
+      category_id = C.asset_category_id
+  ) DESCRIPTION_ASSET_CATEGORY, 
+  C.ASSET_TYPE, 
+  FAV.PARENT_ASSET, 
+  D.DATE_PLACED_IN_SERVICE, 
+  D.DEPRECIATE_FLAG, 
+  D.DEPRN_METHOD_CODE, 
+  D.LIFE_IN_MONTHS, 
+  FAK.SEGMENT1 PEROLEHAN, 
+  FAK.SEGMENT2 KONDISI, 
+  FAK.SEGMENT3 STATUS, 
+  FAK.SEGMENT4 PEMBIAYAAN, 
+  (
+    SELECT 
+      LAST_NAME 
+    FROM 
+      per_all_people_f papf 
+    WHERE 
+      papf.person_id = E.assigned_to 
+      AND (
+        TRUNC (SYSDATE) BETWEEN effective_start_date 
+        AND effective_end_date
+      )
+  ) employee_name, 
+  (
+    SELECT 
+      EMPLOYEE_NUMBER 
+    FROM 
+      per_all_people_f papf 
+    WHERE 
+      papf.person_id = E.assigned_to 
+      AND (
+        TRUNC (SYSDATE) BETWEEN effective_start_date 
+        AND effective_end_date
+      )
+  ) employee_number, 
+  glcc.CONCATENATED_SEGMENTS Expense_Account, 
+  j.name managing_branch, 
+  DECODE (f.segment6, 0, 'TBD', k.name) user_branch, 
+  g.territory_short_name negara, 
+  h.meaning provinsi, 
+  i.meaning kota, 
+  f.segment4 Lokasi, 
+  E.UNITS_ASSIGNED, 
+  D.COST, 
+  (
+    SELECT 
+      TRANSACTION_TYPE_CODE 
+    FROM 
+      FA_TRANSACTION_HEADERS 
+    WHERE 
+      asset_id = D.ASSET_ID 
+      AND transaction_header_id = D.transaction_header_id_in 
+      AND TRANSACTION_TYPE_CODE = 'FULL RETIREMENT'
+  ) STATUS_ASSET, 
+  C.Last_update_date 
+FROM 
+  fa_categories b, 
+  FA_ADDITIONS C, 
+  FA_ADDITIONS fa, 
+  FA_ADDITIONS_V FAV, 
+  FA_BOOKS D, 
+  FA_DISTRIBUTION_HISTORY E, 
+  GL_CODE_COMBINATIONS_KFV glcc, 
+  FA_LOCATIONS f, 
+  FND_TERRITORIES_VL g, 
+  fnd_lookup_values h, 
+  fnd_lookup_values i, 
+  hr_all_organization_units j, 
+  hr_all_organization_units k, 
+  FA_ASSET_KEYWORDS FAK, 
+  FA_FINANCIAL_INQUIRY_COST_V FAF 
+WHERE 
+  b.CATEGORY_ID = C.ASSET_CATEGORY_ID 
+  AND c.PARENT_ASSET_ID = fa.asset_id(+) 
+  AND glcc.CODE_COMBINATION_ID = E.CODE_COMBINATION_ID 
+  AND D.ASSET_ID = C.ASSET_ID 
+  AND E.ASSET_ID = D.ASSET_ID 
+  AND FAV.ASSET_ID = C.ASSET_ID 
+  AND FAV.ASSET_CATEGORY_ID = C.ASSET_CATEGORY_ID 
+  AND E.BOOK_TYPE_CODE = D.BOOK_TYPE_CODE 
+  AND h.lookup_type(+) = 'PROVINSI' 
+  AND i.lookup_type(+) = 'KOTA' 
+  AND f.segment1 = g.territory_code(+) 
+  AND f.segment2 = h.lookup_code(+) 
+  AND f.segment3 = i.lookup_code(+) 
+  AND f.segment5 = j.organization_id(+) 
+  AND f.segment6 = k.organization_id(+) 
+  AND E.LOCATION_ID = f.location_id 
+  AND C.ASSET_KEY_CCID = FAK.CODE_COMBINATION_ID 
+  AND D.transaction_header_id_in = faf.transaction_header_id_in(+) 
+  AND D.transaction_header_id_out IS NULL 
+  AND E.transaction_header_id_out IS NULL 
+  AND FAF.sob_id(+) = '2024' 
+  AND FAF.BOOK_TYPE_CODE(+) = D.BOOK_TYPE_CODE 
+  AND FAF.ASSET_ID(+) = D.ASSET_ID 
+  AND e.transaction_header_id_in = (
+    SELECT 
+      MAX (transaction_header_id_in) 
+    FROM 
+      FA_DISTRIBUTION_HISTORY e2 
+    WHERE 
+      e2.BOOK_TYPE_CODE = e.BOOK_TYPE_CODE 
+      AND e2.asset_id = e.asset_id
+  )
